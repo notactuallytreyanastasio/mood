@@ -1,0 +1,127 @@
+version: '3.8'
+
+services:
+  # z/OS Mainframe Emulator
+  mainframe:
+    image: rattydave/docker-ubuntu-hercules-mvs:latest
+    container_name: doom-mainframe
+    hostname: mvs
+    ports:
+      - "3270:3270"     # TN3270 terminal access
+      - "8038:8038"     # Hercules HTTP console
+      - "2121:2121"     # FTP for dataset transfer
+    volumes:
+      - ./mvs-data:/hercules/data
+      - ./cobol:/hercules/cobol:ro
+      - ./jcl:/hercules/jcl:ro
+      - mvs-datasets:/hercules/datasets
+    environment:
+      - TZ=UTC
+      - HERCULES_RC=/hercules/scripts/doom-init.rc
+    networks:
+      - doom-net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "3270"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # DOOM-COBOL Bridge Service
+  bridge:
+    build: 
+      context: ./bridge
+      dockerfile: Dockerfile
+    container_name: doom-bridge
+    hostname: bridge
+    depends_on:
+      mainframe:
+        condition: service_healthy
+    volumes:
+      # X11 socket for Linux GUI access
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # Shared memory for faster DOOM state reading
+      - /dev/shm:/dev/shm
+      # Bridge data persistence
+      - bridge-data:/data
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - MVS_HOST=mainframe
+      - MVS_FTP_PORT=2121
+      - MVS_USER=HERC01
+      - MVS_PASS=CUL8TR
+      - DOOM_PROCESS_NAME=${DOOM_PROCESS_NAME:-doom}
+      - BRIDGE_MODE=${BRIDGE_MODE:-auto}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    network_mode: host  # Need host network for process memory access
+    privileged: true    # Required for memory reading
+    restart: unless-stopped
+    command: ["python", "-u", "doom_bridge.py", "--auto-retry"]
+
+  # FTP Gateway for easier dataset management
+  ftp-gateway:
+    build:
+      context: ./ftp-gateway
+      dockerfile: Dockerfile
+    container_name: doom-ftp-gateway
+    depends_on:
+      - mainframe
+    ports:
+      - "2122:21"  # External FTP access
+    environment:
+      - BACKEND_HOST=mainframe
+      - BACKEND_PORT=2121
+    networks:
+      - doom-net
+    restart: unless-stopped
+
+  # Web UI for monitoring and control
+  web-ui:
+    build:
+      context: ./web-ui
+      dockerfile: Dockerfile
+    container_name: doom-web-ui
+    depends_on:
+      - mainframe
+      - bridge
+    ports:
+      - "8080:8080"
+    environment:
+      - MVS_HOST=mainframe
+      - BRIDGE_HOST=bridge
+    networks:
+      - doom-net
+    restart: unless-stopped
+
+  # COBOL Command Interface
+  cobol-interface:
+    build:
+      context: ./cobol-interface
+      dockerfile: Dockerfile
+    container_name: doom-cobol-interface
+    depends_on:
+      - mainframe
+      - bridge
+    ports:
+      - "9999:9999"  # TCP port for COBOL command submission
+    volumes:
+      - ./commands:/commands
+    environment:
+      - MVS_HOST=mainframe
+      - MVS_FTP_PORT=2121
+      - COMMAND_PORT=9999
+    networks:
+      - doom-net
+    restart: unless-stopped
+
+networks:
+  doom-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  mvs-datasets:
+    driver: local
+  bridge-data:
+    driver: local
