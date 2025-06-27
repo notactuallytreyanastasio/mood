@@ -8,19 +8,39 @@ import time
 import threading
 from typing import List
 import logging
+import sys
+import platform
 
-try:
-    import os
-    # Set a dummy display if not set
-    if 'DISPLAY' not in os.environ:
-        os.environ['DISPLAY'] = ':99'
-    import pyautogui
-    PYAUTOGUI_AVAILABLE = True
-    pyautogui.FAILSAFE = False
-    pyautogui.PAUSE = 0.1
-except ImportError as e:
-    PYAUTOGUI_AVAILABLE = False
-    logging.warning(f"pyautogui not available - DOOM control disabled: {e}")
+# Check if we're on macOS
+IS_MACOS = platform.system() == 'Darwin'
+
+# Try to import the appropriate controller
+CONTROLLER_AVAILABLE = False
+doom_controller = None
+
+if IS_MACOS:
+    # On macOS, prefer AppleScript controller
+    try:
+        from applescript_doom import doom_controller
+        CONTROLLER_AVAILABLE = True
+        logging.info("Using AppleScript controller for macOS")
+    except ImportError as e:
+        logging.warning(f"AppleScript controller not available: {e}")
+        
+# Fallback to pyautogui
+if not CONTROLLER_AVAILABLE:
+    try:
+        import os
+        # Set a dummy display if not set
+        if 'DISPLAY' not in os.environ:
+            os.environ['DISPLAY'] = ':99'
+        import pyautogui
+        PYAUTOGUI_AVAILABLE = True
+        pyautogui.FAILSAFE = False
+        pyautogui.PAUSE = 0.1
+    except ImportError as e:
+        PYAUTOGUI_AVAILABLE = False
+        logging.warning(f"pyautogui not available - DOOM control disabled: {e}")
 
 class DirectDoomController:
     """Execute DOOM commands directly"""
@@ -116,6 +136,23 @@ class DirectDoomController:
             {'type': 'wait', 'duration': 50},
             {'type': 'key', 'action': 'keyUp', 'key': str(weapon_num)}
         ])
+        
+    def add_escape_command(self):
+        """Add ESC key command to queue"""
+        self.command_queue.extend([
+            {'type': 'key', 'action': 'press', 'key': 'escape'},
+            {'type': 'wait', 'duration': 100},
+            {'type': 'key', 'action': 'keyUp', 'key': 'escape'}
+        ])
+        
+    def add_enter_command(self):
+        """Add Enter key command to queue"""
+        self.command_queue.extend([
+            {'type': 'key', 'action': 'press', 'key': 'enter'},
+            {'type': 'wait', 'duration': 100},
+            {'type': 'key', 'action': 'keyUp', 'key': 'enter'}
+        ])
 
 # Global controller instance
-doom_controller = DirectDoomController()
+if not CONTROLLER_AVAILABLE:
+    doom_controller = DirectDoomController()

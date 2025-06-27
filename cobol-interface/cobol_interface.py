@@ -165,6 +165,14 @@ class COBOLInterface:
             weapon_num = int(parts[1])
             return self.submit_weapon_command(weapon_num)
             
+        elif action == "ESCAPE" or action == "ESC":
+            # ESCAPE - Press ESC key (for menus)
+            return self.submit_escape_command()
+            
+        elif action == "ENTER":
+            # ENTER - Press Enter key (for menus) 
+            return self.submit_enter_command()
+            
         elif action == "RUN":
             # RUN jobname - Submit custom JCL
             if len(parts) < 2:
@@ -236,6 +244,10 @@ class COBOLInterface:
         
     def submit_shoot_command(self, count: int) -> str:
         """Submit shoot command to MVS"""
+        # Direct control if available
+        if DIRECT_CONTROL:
+            doom_controller.add_shoot_command(count)
+            
         commands = []
         for _ in range(count):
             commands.extend([
@@ -245,17 +257,27 @@ class COBOLInterface:
                 "WAIT 0200"            # Wait between shots
             ])
             
-        return self.upload_commands(commands)
+        result = self.upload_commands(commands)
+        if DIRECT_CONTROL and "OK" in result:
+            return result + " + DIRECT"
+        return result
         
     def submit_use_command(self) -> str:
         """Submit use command to MVS"""
+        # Direct control if available
+        if DIRECT_CONTROL:
+            doom_controller.add_use_command()
+            
         commands = [
             "KPE   +000+000",  # Press E (use key)
             "WAIT 0100",
             "KRE   +000+000"   # Release E
         ]
         
-        return self.upload_commands(commands)
+        result = self.upload_commands(commands)
+        if DIRECT_CONTROL and "OK" in result:
+            return result + " + DIRECT"
+        return result
         
     def submit_weapon_command(self, weapon_num: int) -> str:
         """Submit weapon switch command to MVS"""
@@ -269,6 +291,40 @@ class COBOLInterface:
         ]
         
         return self.upload_commands(commands)
+        
+    def submit_escape_command(self) -> str:
+        """Submit ESC key command to MVS"""
+        # Direct control if available
+        if DIRECT_CONTROL:
+            doom_controller.add_escape_command()
+            
+        commands = [
+            "KPESC +000+000",  # Press ESC
+            "WAIT 0100",
+            "KRESC +000+000"   # Release ESC
+        ]
+        
+        result = self.upload_commands(commands)
+        if DIRECT_CONTROL and "OK" in result:
+            return result + " + DIRECT"
+        return result
+        
+    def submit_enter_command(self) -> str:
+        """Submit Enter key command to MVS"""
+        # Direct control if available
+        if DIRECT_CONTROL:
+            doom_controller.add_enter_command()
+            
+        commands = [
+            "KPENT +000+000",  # Press Enter
+            "WAIT 0100",
+            "KRENT +000+000"   # Release Enter
+        ]
+        
+        result = self.upload_commands(commands)
+        if DIRECT_CONTROL and "OK" in result:
+            return result + " + DIRECT"
+        return result
         
     def upload_commands(self, commands: List[str]) -> str:
         """Upload command records to MVS DOOM.COMMANDS dataset"""

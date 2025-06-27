@@ -11,7 +11,8 @@ fi
 
 # Install Python dependencies locally
 echo "Installing Python dependencies..."
-pip3 install pyautogui flask flask-cors websockets aiohttp
+pip3 install -r cobol-interface/requirements.txt
+pip3 install flask flask-cors websockets aiohttp
 
 # Stop any existing Docker containers
 echo "Stopping Docker containers..."
