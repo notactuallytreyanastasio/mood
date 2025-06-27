@@ -1,0 +1,19 @@
+# Simplified DOOM-COBOL Makefile for testing
+
+.PHONY: build-simple up-simple down-simple test-simple
+
+build-simple:
+	docker-compose -f docker-compose-simple.yml build
+
+up-simple: build-simple
+	docker-compose -f docker-compose-simple.yml up -d
+	@echo "Simple services started:"
+	@echo "  - COBOL Interface: telnet localhost 9999"
+	@echo "  - Web UI: http://localhost:8080"
+
+down-simple:
+	docker-compose -f docker-compose-simple.yml down
+
+test-simple:
+	@echo "Testing COBOL interface..."
+	@echo "STATUS" | nc localhost 9999 || echo "Interface not ready yet"

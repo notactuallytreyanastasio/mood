@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOOM-COBOL Control Center</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #000;
+            color: #0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #f00;
+            text-shadow: 0 0 10px #f00;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .panel {
+            border: 2px solid #0f0;
+            padding: 15px;
+            background-color: #001100;
+            box-shadow: 0 0 10px #0f0;
+        }
+        
+        .panel h2 {
+            margin-top: 0;
+            color: #0ff;
+            border-bottom: 1px solid #0ff;
+            padding-bottom: 5px;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px;
+            background-color: #002200;
+            border: 1px solid #0f0;
+        }
+        
+        .status-online { color: #0f0; }
+        .status-offline { color: #f00; }
+        .status-unknown { color: #ff0; }
+        
+        .command-input {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        input[type="text"] {
+            flex: 1;
+            background-color: #000;
+            color: #0f0;
+            border: 1px solid #0f0;
+            padding: 8px;
+            font-family: inherit;
+            font-size: 14px;
+        }
+        
+        button {
+            background-color: #0f0;
+            color: #000;
+            border: none;
+            padding: 8px 15px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        button:hover {
+            background-color: #0ff;
+            box-shadow: 0 0 10px #0ff;
+        }
+        
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            margin-top: 10px;
+        }
+        
+        .history {
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: #000;
+            border: 1px solid #0f0;
+            padding: 5px;
+            font-size: 12px;
+        }
+        
+        .history-item {
+            margin-bottom: 5px;
+            padding: 2px;
+        }
+        
+        .history-item.success { color: #0f0; }
+        .history-item.error { color: #f00; }
+        
+        .game-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+            font-size: 14px;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #ff0;
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>DOOM-COBOL CONTROL CENTER</h1>
+        
+        <div class="grid">
+            <!-- System Status Panel -->
+            <div class="panel">
+                <h2>SYSTEM STATUS</h2>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <span>MAINFRAME:</span>
+                        <span id="status-mainframe" class="status-unknown">CHECKING...</span>
+                    </div>
+                    <div class="status-item">
+                        <span>BRIDGE:</span>
+                        <span id="status-bridge" class="status-unknown">CHECKING...</span>
+                    </div>
+                    <div class="status-item">
+                        <span>DOOM:</span>
+                        <span id="status-doom" class="status-unknown">CHECKING...</span>
+                    </div>
+                    <div class="status-item">
+                        <span>LAST UPDATE:</span>
+                        <span id="last-update">NEVER</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Game State Panel -->
+            <div class="panel">
+                <h2>GAME STATE</h2>
+                <div class="game-stats" id="game-stats">
+                    <div class="loading">LOADING...</div>
+                </div>
+            </div>
+            
+            <!-- Command Panel -->
+            <div class="panel">
+                <h2>COMMAND INTERFACE</h2>
+                <div class="command-input">
+                    <input type="text" id="command-input" placeholder="Enter COBOL command..." 
+                           onkeypress="if(event.key === 'Enter') sendCommand()">
+                    <button onclick="sendCommand()">SEND</button>
+                </div>
+                
+                <div class="button-grid">
+                    <button onclick="quickCommand('MOVE FORWARD')">FORWARD</button>
+                    <button onclick="quickCommand('MOVE BACK')">BACK</button>
+                    <button onclick="quickCommand('TURN RIGHT 45')">TURN →</button>
+                    <button onclick="quickCommand('MOVE LEFT')">LEFT</button>
+                    <button onclick="quickCommand('USE')">USE</button>
+                    <button onclick="quickCommand('TURN LEFT 45')">TURN ←</button>
+                    <button onclick="quickCommand('SHOOT')">SHOOT</button>
+                    <button onclick="quickCommand('WEAPON 2')">SHOTGUN</button>
+                    <button onclick="quickCommand('STATUS')">STATUS</button>
+                </div>
+            </div>
+            
+            <!-- History Panel -->
+            <div class="panel">
+                <h2>COMMAND HISTORY</h2>
+                <div class="history" id="history">
+                    <div class="history-item">Waiting for commands...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Update status every 2 seconds
+        setInterval(updateStatus, 2000);
+        
+        // Initial update
+        updateStatus();
+        
+        function updateStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    // Update system status
+                    updateStatusIndicator('status-mainframe', data.system_status.mainframe);
+                    updateStatusIndicator('status-bridge', data.system_status.bridge);
+                    updateStatusIndicator('status-doom', data.system_status.doom);
+                    
+                    // Update last update time
+                    if (data.last_update) {
+                        const date = new Date(data.last_update);
+                        document.getElementById('last-update').textContent = 
+                            date.toLocaleTimeString();
+                    }
+                    
+                    // Update game state
+                    if (data.game_state && Object.keys(data.game_state).length > 0) {
+                        updateGameStats(data.game_state);
+                    }
+                })
+                .catch(error => {
+                    console.error('Failed to update status:', error);
+                });
+        }
+        
+        function updateStatusIndicator(elementId, status) {
+            const element = document.getElementById(elementId);
+            element.textContent = status.toUpperCase();
+            element.className = `status-${status}`;
+        }
+        
+        function updateGameStats(state) {
+            const statsDiv = document.getElementById('game-stats');
+            statsDiv.innerHTML = `
+                <div>TICK: ${state.tick || 0}</div>
+                <div>HEALTH: ${state.health || 0}</div>
+                <div>X: ${state.player_x || 0}</div>
+                <div>Y: ${state.player_y || 0}</div>
+                <div>ANGLE: ${state.player_angle || 0}°</div>
+                <div>ARMOR: ${state.armor || 0}</div>
+                <div>WEAPON: ${state.current_weapon || 1}</div>
+                <div>LEVEL: ${state.level || 1}</div>
+            `;
+        }
+        
+        function sendCommand() {
+            const input = document.getElementById('command-input');
+            const command = input.value.trim();
+            
+            if (!command) return;
+            
+            fetch('/api/command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ command: command })
+            })
+            .then(response => response.json())
+            .then(data => {
+                addToHistory(command, data.success, data.response || data.error);
+                input.value = '';
+            })
+            .catch(error => {
+                addToHistory(command, false, 'Network error');
+            });
+        }
+        
+        function quickCommand(command) {
+            document.getElementById('command-input').value = command;
+            sendCommand();
+        }
+        
+        function addToHistory(command, success, response) {
+            const historyDiv = document.getElementById('history');
+            const time = new Date().toLocaleTimeString();
+            const item = document.createElement('div');
+            item.className = `history-item ${success ? 'success' : 'error'}`;
+            item.textContent = `[${time}] ${command} → ${response}`;
+            
+            historyDiv.insertBefore(item, historyDiv.firstChild);
+            
+            // Keep only last 50 items
+            while (historyDiv.children.length > 50) {
+                historyDiv.removeChild(historyDiv.lastChild);
+            }
+        }
+    </script>
+</body>
+</html>

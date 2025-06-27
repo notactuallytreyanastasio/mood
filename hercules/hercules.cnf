@@ -1,0 +1,60 @@
+# Hercules Configuration for DOOM-COBOL MVS
+# Based on TK4- configuration with modifications
+
+# CPU Configuration
+CPUSERIAL 002623
+CPUMODEL  3033
+MODEL     EMULATOR
+PLANT     ZZ
+MANUFACTURER HRC
+LPARNAME  HERCULES
+CPUIDFMT  0
+XPNDSIZE  0
+MAXCPU    2
+NUMCPU    2
+LOADPARM  0120....
+OSTAILOR  OS/390
+PANRATE   FAST
+ARCHMODE  S/370
+
+# Main Storage
+MAINSIZE  16
+XPNDSIZE  0
+
+# Console
+CNSLPORT  3270
+
+# HTTP Server
+HTTP      PORT 8038 NOAUTH
+
+# Integrated console
+SYSGPORT  3278
+
+# DASD Devices - TK4- standard configuration
+0120 3350 dasd/mvsres.3350
+0121 3350 dasd/mvs000.3350
+0122 3350 dasd/mvscat.3350
+0148 3350 dasd/syscpk.3350
+
+# DOOM Datasets - Additional volume for our COBOL programs
+0200 3350 dasd/doomd1.3350
+
+# Tape Drives
+0480 3420 *
+0481 3420 *
+
+# Unit record devices
+000C 3505 reader/jcl sockdev ascii trunc eof
+000D 3525 punch/pch00d.txt ascii
+000E 1403 print/prt00e.txt crlf
+001F 1403 print/prt001f.txt crlf
+0002 3215-C /
+
+# Network devices
+0400 CTCI 172.20.0.10 172.20.0.11
+
+# Terminal devices
+0700.32 3270
+
+# Card reader for job submission
+01C0 3505 sockdev ascii trunc eof

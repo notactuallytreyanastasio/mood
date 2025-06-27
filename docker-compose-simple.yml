@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # COBOL Command Interface
+  cobol-interface:
+    build:
+      context: ./cobol-interface
+      dockerfile: Dockerfile
+    container_name: doom-cobol-interface
+    ports:
+      - "9999:9999"
+    environment:
+      - COMMAND_PORT=9999
+      - MVS_HOST=localhost  # Will be mainframe later
+      - DISPLAY=:99
+    networks:
+      - doom-net
+    restart: unless-stopped
+
+  # Web UI for monitoring and control
+  web-ui:
+    build:
+      context: ./web-ui
+      dockerfile: Dockerfile
+    container_name: doom-web-ui
+    ports:
+      - "8080:8080"
+    environment:
+      - MVS_HOST=localhost  # Will be mainframe later
+    networks:
+      - doom-net
+    restart: unless-stopped
+
+networks:
+  doom-net:
+    driver: bridge
