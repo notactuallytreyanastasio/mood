@@ -1,0 +1,106 @@
+diff --git a/linuxdoom-1.10/g_game.c b/linuxdoom-1.10/g_game.c
+index 1234567..abcdefg 100644
+--- a/linuxdoom-1.10/g_game.c
++++ b/linuxdoom-1.10/g_game.c
+@@ -30,6 +30,10 @@
+ #include <string.h>
+ #include <stdlib.h>
+ 
++#include <sys/socket.h>
++#include <netinet/in.h>
++#include <arpa/inet.h>
++
+ #include "doomdef.h"
+ #include "doomstat.h"
+ 
+@@ -85,6 +89,9 @@
+ 
+ #define BODYQUESIZE	32
+ 
++// State export server
++static int state_socket = -1;
++static struct sockaddr_in state_addr;
+ 
+ mobj_t*		bodyque[BODYQUESIZE];
+ int		bodyqueslot;
+@@ -249,6 +256,60 @@ static boolean	demorecording;
+ 
+ boolean G_CheckDemoStatus (void);
+ void G_ReadDemoTiccmd (ticcmd_t* cmd);
++
++//
++// State Export Functions
++//
++void G_InitStateServer(void)
++{
++    state_socket = socket(AF_INET, SOCK_DGRAM, 0);
++    if (state_socket < 0) return;
++    
++    memset(&state_addr, 0, sizeof(state_addr));
++    state_addr.sin_family = AF_INET;
++    state_addr.sin_port = htons(6666);
++    state_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
++}
++
++void G_ExportGameState(void)
++{
++    if (state_socket < 0 || !playeringame[0] || !players[0].mo)
++        return;
++        
++    player_t* p = &players[0];
++    mobj_t* mo = p->mo;
++    
++    // Create state packet
++    struct {
++        int32_t tick;
++        int32_t health;
++        int32_t armor;
++        int32_t ammo[NUMAMMO];
++        int32_t weapon;
++        int32_t x;
++        int32_t y;
++        int32_t z;
++        int32_t angle;
++        int32_t level;
++    } state;
++    
++    state.tick = gametic;
++    state.health = p->health;
++    state.armor = p->armorpoints;
++    for (int i = 0; i < NUMAMMO; i++)
++        state.ammo[i] = p->ammo[i];
++    state.weapon = p->readyweapon;
++    state.x = mo->x >> FRACBITS;
++    state.y = mo->y >> FRACBITS;
++    state.z = mo->z >> FRACBITS;
++    state.angle = mo->angle >> ANGLETOFINESHIFT;
++    state.level = gamemap;
++    
++    // Send state via UDP
++    sendto(state_socket, &state, sizeof(state), 0,
++           (struct sockaddr*)&state_addr, sizeof(state_addr));
++}
++
+ void G_WriteDemoTiccmd (ticcmd_t* cmd);
+ void G_PlayerReborn (int player);
+ void G_InitNew (skill_t skill, int episode, int map);
+@@ -891,6 +952,9 @@ void G_Ticker (void)
+     // do main actions
+     switch (gamestate)
+     {
++      case GS_LEVEL:
++	G_ExportGameState();  // Export state every tick during gameplay
++	// fall through
+       case GS_LEVEL:
+ 	P_Ticker ();
+ 	ST_Ticker ();
+@@ -1705,6 +1769,9 @@ void G_InitNew
+ 
+     if (skill > sk_nightmare)
+ 	skill = sk_nightmare;
++	
++    // Initialize state export
++    G_InitStateServer();
+ 
+     // This was quite messy with SPECIAL and commented parts.
+     // Supposedly hacks to make the latest edition work.

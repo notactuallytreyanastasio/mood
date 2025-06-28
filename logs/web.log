@@ -1,0 +1,31 @@
+INFO:build_system.ftp_action_reader:Started monitoring mvs_datasets
+INFO:build_system.ftp_action_reader:Processing DOOM.COMMANDS.ASCII
+
+╔══════════════════════════════════════════════════════════╗
+║            DOOM-COBOL Action Web Server                  ║
+╚══════════════════════════════════════════════════════════╝
+
+Web Interface: http://localhost:8080
+API Base: http://localhost:8080/api
+
+Monitoring: mvs_datasets
+Max History: 100 actions
+
+NOTE: This server displays actions but does NOT send them to DOOM yet.
+That will be implemented in Step 9.
+
+Press Ctrl+C to stop
+
+ * Serving Flask app 'cobol_action_server'
+ * Debug mode: off
+INFO:build_system.ftp_action_reader:Queued 0 commands
+INFO:werkzeug:[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://192.168.221.27:8080
+INFO:werkzeug:[33mPress CTRL+C to quit[0m
+INFO:__main__:New action: MOVE FORWARD 2.0
+INFO:__main__:New action: TURN RIGHT 45
+INFO:__main__:New action: SHOOT 1
+INFO:__main__:New action: MOVE BACK 2.0
+INFO:__main__:New action: WAIT 1.0

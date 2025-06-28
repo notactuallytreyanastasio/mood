@@ -365,6 +365,9 @@ void D_DoomLoop (void)
     }
 	
     I_InitGraphics ();
+    
+    // Initialize state export
+    X_InitState();
 
     while (1)
     {

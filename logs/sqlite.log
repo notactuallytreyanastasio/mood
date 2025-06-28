@@ -1,0 +1,18 @@
+2025-06-28 12:45:57,539 - Database initialized: doom_state.db
+2025-06-28 12:45:57,539 - Session ID: 1
+2025-06-28 12:45:57,539 - Listening for DOOM state on UDP port 31337
+2025-06-28 12:46:02,545 - Stats - Packets: 47, Last tick: 67, Rate: 9.4/sec
+2025-06-28 12:46:07,551 - Stats - Packets: 94, Last tick: 114, Rate: 9.4/sec
+2025-06-28 12:46:12,555 - Stats - Packets: 141, Last tick: 161, Rate: 9.4/sec
+Exception in thread Thread-2 (_stats_loop):
+Traceback (most recent call last):
+  File "/Users/robertgrayson/.asdf/installs/python/3.13.4t/lib/python3.13t/threading.py", line 1043, in _bootstrap_inner
+    self.run()
+    ~~~~~~~~^^
+  File "/Users/robertgrayson/.asdf/installs/python/3.13.4t/lib/python3.13t/threading.py", line 994, in run
+    self._target(*self._args, **self._kwargs)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/robertgrayson/playground/DOOM/build_system/doom_state_sqlite.py", line 324, in _stats_loop
+    self.conn.commit()
+    ~~~~~~~~~~~~~~~~^^
+sqlite3.OperationalError: cannot commit transaction - SQL statements in progress

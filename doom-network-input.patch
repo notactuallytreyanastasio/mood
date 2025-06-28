@@ -1,0 +1,287 @@
+diff --git a/linuxdoom-1.10/i_video.c b/linuxdoom-1.10/i_video.c
+index 1234567..abcdefg 100644
+--- a/linuxdoom-1.10/i_video.c
++++ b/linuxdoom-1.10/i_video.c
+@@ -52,6 +52,10 @@ rcsid[] = "$Id: i_video.c,v 1.2 1997/01/26 07:45:10 b1 Exp $";
+ #include "d_main.h"
+ 
+ #include "doomstat.h"
++
++// Network input
++#include "n_input.h"
++
+ 
+ // Fake mouse handling.
+ // This cannot work properly w/o DGA.
+@@ -193,6 +197,9 @@ void I_GetEvent(void)
+ 
+     event_t event;
+ 
++    // Check for network commands first
++    N_ProcessNetworkInput();
++
+     // put event-grabbing stuff in here
+     XNextEvent(X_display, &X_event);
+     switch (X_event.type)
+diff --git a/linuxdoom-1.10/n_input.c b/linuxdoom-1.10/n_input.c
+new file mode 100644
+index 0000000..1234567
+--- /dev/null
++++ b/linuxdoom-1.10/n_input.c
+@@ -0,0 +1,195 @@
++// n_input.c - Network Input for DOOM
++// Allows remote control via UDP commands
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++#include <fcntl.h>
++#include <sys/socket.h>
++#include <netinet/in.h>
++#include <arpa/inet.h>
++#include <errno.h>
++
++#include "doomdef.h"
++#include "d_event.h"
++#include "doomstat.h"
++#include "n_input.h"
++
++#define INPUT_PORT 31338
++#define MAX_CMD_LEN 64
++
++static int input_socket = -1;
++static boolean network_input_enabled = false;
++
++// Command queue
++typedef struct {
++    int type;       // 0=key, 1=mouse
++    int code;       // key code or mouse button
++    int action;     // 0=release, 1=press
++    int dx, dy;     // mouse movement
++    int duration;   // milliseconds
++} net_command_t;
++
++static net_command_t cmd_queue[64];
++static int cmd_write = 0;
++static int cmd_read = 0;
++
++// Initialize network input
++void N_InitNetworkInput(void)
++{
++    struct sockaddr_in addr;
++    
++    // Check if disabled
++    if (M_CheckParm("-nonetinput")) {
++        printf("Network input disabled\n");
++        return;
++    }
++    
++    // Create UDP socket
++    input_socket = socket(AF_INET, SOCK_DGRAM, 0);
++    if (input_socket < 0) {
++        printf("Failed to create input socket\n");
++        return;
++    }
++    
++    // Make non-blocking
++    fcntl(input_socket, F_SETFL, O_NONBLOCK);
++    
++    // Bind to port
++    memset(&addr, 0, sizeof(addr));
++    addr.sin_family = AF_INET;
++    addr.sin_port = htons(INPUT_PORT);
++    addr.sin_addr.s_addr = INADDR_ANY;
++    
++    if (bind(input_socket, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
++        printf("Failed to bind input port %d\n", INPUT_PORT);
++        close(input_socket);
++        input_socket = -1;
++        return;
++    }
++    
++    network_input_enabled = true;
++    printf("Network input listening on UDP port %d\n", INPUT_PORT);
++}
++
++// Parse text command into internal format
++static boolean N_ParseCommand(char* cmd, net_command_t* out)
++{
++    char action[16], param1[16], param2[16];
++    int count;
++    
++    // Clear output
++    memset(out, 0, sizeof(net_command_t));
++    
++    // Parse command
++    count = sscanf(cmd, "%15s %15s %15s", action, param1, param2);
++    if (count < 1) return false;
++    
++    // Movement commands
++    if (strcasecmp(action, "FORWARD") == 0) {
++        out->type = 0;
++        out->code = 'w';
++        out->action = 1;
++        out->duration = count > 1 ? atoi(param1) * 1000 : 500;
++    }
++    else if (strcasecmp(action, "BACK") == 0) {
++        out->type = 0;
++        out->code = 's';
++        out->action = 1;
++        out->duration = count > 1 ? atoi(param1) * 1000 : 500;
++    }
++    else if (strcasecmp(action, "LEFT") == 0) {
++        out->type = 0;
++        out->code = 'a';
++        out->action = 1;
++        out->duration = count > 1 ? atoi(param1) * 1000 : 500;
++    }
++    else if (strcasecmp(action, "RIGHT") == 0) {
++        out->type = 0;
++        out->code = 'd';
++        out->action = 1;
++        out->duration = count > 1 ? atoi(param1) * 1000 : 500;
++    }
++    // Turn commands
++    else if (strcasecmp(action, "TURNLEFT") == 0) {
++        out->type = 1;
++        out->dx = -(count > 1 ? atoi(param1) : 45) * 5;
++    }
++    else if (strcasecmp(action, "TURNRIGHT") == 0) {
++        out->type = 1;
++        out->dx = (count > 1 ? atoi(param1) : 45) * 5;
++    }
++    // Action commands
++    else if (strcasecmp(action, "SHOOT") == 0) {
++        out->type = 0;
++        out->code = KEY_RCTRL;  // Fire key
++        out->action = 1;
++        out->duration = 100;
++    }
++    else if (strcasecmp(action, "USE") == 0) {
++        out->type = 0;
++        out->code = ' ';  // Space = use
++        out->action = 1;
++        out->duration = 100;
++    }
++    else {
++        return false;
++    }
++    
++    return true;
++}
++
++// Process incoming network commands
++void N_ProcessNetworkInput(void)
++{
++    char buffer[MAX_CMD_LEN];
++    struct sockaddr_in from;
++    socklen_t fromlen = sizeof(from);
++    ssize_t len;
++    net_command_t cmd;
++    event_t event;
++    
++    if (!network_input_enabled || input_socket < 0)
++        return;
++    
++    // Read all pending commands
++    while (1) {
++        len = recvfrom(input_socket, buffer, sizeof(buffer)-1, 0,
++                      (struct sockaddr*)&from, &fromlen);
++        
++        if (len <= 0) {
++            if (errno != EAGAIN && errno != EWOULDBLOCK) {
++                // Real error
++            }
++            break;
++        }
++        
++        buffer[len] = '\0';
++        
++        // Parse and queue command
++        if (N_ParseCommand(buffer, &cmd)) {
++            // Generate event immediately
++            if (cmd.type == 0) {
++                // Keyboard event
++                event.type = cmd.action ? ev_keydown : ev_keyup;
++                event.data1 = cmd.code;
++                D_PostEvent(&event);
++                
++                // Schedule key release if duration specified
++                if (cmd.action && cmd.duration > 0) {
++                    // TODO: Implement timed release
++                }
++            }
++            else if (cmd.type == 1) {
++                // Mouse event
++                event.type = ev_mouse;
++                event.data1 = 0;  // No buttons
++                event.data2 = cmd.dx;
++                event.data3 = cmd.dy;
++                D_PostEvent(&event);
++            }
++        }
++    }
++}
++
++// Shutdown network input
++void N_ShutdownNetworkInput(void)
++{
++    if (input_socket >= 0) {
++        close(input_socket);
++        input_socket = -1;
++    }
++}
+diff --git a/linuxdoom-1.10/n_input.h b/linuxdoom-1.10/n_input.h
+new file mode 100644
+index 0000000..1234567
+--- /dev/null
++++ b/linuxdoom-1.10/n_input.h
+@@ -0,0 +1,10 @@
++// n_input.h - Network Input for DOOM
++
++#ifndef __N_INPUT__
++#define __N_INPUT__
++
++void N_InitNetworkInput(void);
++void N_ProcessNetworkInput(void);
++void N_ShutdownNetworkInput(void);
++
++#endif
+diff --git a/linuxdoom-1.10/d_main.c b/linuxdoom-1.10/d_main.c
+index 1234567..abcdefg 100644
+--- a/linuxdoom-1.10/d_main.c
++++ b/linuxdoom-1.10/d_main.c
+@@ -103,6 +103,9 @@ rcsid[] = "$Id: d_main.c,v 1.8 1997/02/03 22:45:09 b1 Exp $";
+ 
+ #include "am_map.h"
+ 
++// Network input
++#include "n_input.h"
++
+ extern boolean	setsizeneeded;
+ extern int	showMessages;
+ void R_ExecuteSetViewSize (void);
+@@ -881,6 +884,9 @@ void D_DoomMain (void)
+ 	    D_AddFile (file);
+     }
+     
++    // Initialize network input
++    N_InitNetworkInput();
++    
+     p = M_CheckParm ("-playdemo");
+ 
+     if (!p)
+diff --git a/linuxdoom-1.10/Makefile b/linuxdoom-1.10/Makefile
+index 1234567..abcdefg 100644
+--- a/linuxdoom-1.10/Makefile
++++ b/linuxdoom-1.10/Makefile
+@@ -76,7 +76,8 @@ OBJS=\
+ 	v_video.o \
+ 	st_lib.o \
+ 	st_stuff.o \
+-	x_state.o
++	x_state.o \
++	n_input.o
+ 
+ all:	 $(O)/linuxxdoom

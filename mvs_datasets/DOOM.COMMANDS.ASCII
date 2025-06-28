@@ -1,0 +1,5 @@
+COMMAND MOVE    FORWARD 00209EXPLORATION MODE                               
+COMMAND TURN    RIGHT   00453SCAN FOR ENEMIES                               
+COMMAND SHOOT           00015ENEMY DETECTED                                 
+COMMAND MOVE    BACK    00209TACTICAL RETREAT                               
+COMMAND WAIT            00107PROCESSING THREAT                              

@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # Mock MVS FTP Server with Dataset Support
+  ftp-gateway:
+    build: ./ftp-gateway
+    container_name: doom-ftp-gateway
+    ports:
+      - "2121:2121"  # FTP port
+    volumes:
+      - ./jcl:/jcl:ro  # JCL jobs
+      - doom-state:/state  # Shared state files
+    networks:
+      - doom-net
+    environment:
+      - FTP_HOST=localhost
+      - FTP_PORT=2121
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2121"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # COBOL Interface (receives commands)
+  cobol-interface:
+    build: ./cobol-interface
+    container_name: doom-cobol-interface
+    ports:
+      - "9999:9999"  # Command port
+      - "8080:8080"  # Web UI
+    volumes:
+      - doom-state:/state
+    networks:
+      - doom-net
+    environment:
+      - MVS_HOST=ftp-gateway
+      - MVS_PORT=2121
+      - MVS_USER=HERC01
+      - MVS_PASS=CUL8TR
+    depends_on:
+      ftp-gateway:
+        condition: service_healthy
+
+  # Bridge Service (reads DOOM state)
+  doom-bridge:
+    build: ./bridge
+    container_name: doom-bridge
+    volumes:
+      - doom-state:/state
+      - /tmp/doom_state.dat:/tmp/doom_state.dat:ro  # Read DOOM state from host
+    networks:
+      - doom-net
+    environment:
+      - FTP_HOST=ftp-gateway
+      - FTP_PORT=2121
+      - INTERFACE_HOST=cobol-interface
+      - INTERFACE_PORT=9999
+    depends_on:
+      - ftp-gateway
+      - cobol-interface
+
+networks:
+  doom-net:
+    driver: bridge
+
+volumes:
+  doom-state:

@@ -1,0 +1,65 @@
+FROM ubuntu:22.04
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    xvfb \
+    x11vnc \
+    chocolate-doom \
+    python3 \
+    python3-pip \
+    python3-psutil \
+    python3-pyautogui \
+    netcat \
+    gdb \
+    procps \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages
+RUN pip3 install flask flask-cors structlog
+
+# Create doom user
+RUN useradd -m -s /bash doom
+
+# Setup directories
+WORKDIR /doom
+RUN mkdir -p /doom/wads /doom/bridge /doom/cobol-interface
+
+# Copy WAD file
+COPY wads/doom1.wad /doom/wads/
+
+# Copy bridge and interface code
+COPY bridge/*.py /doom/bridge/
+COPY cobol-interface/*.py /doom/cobol-interface/
+
+# Create startup script
+RUN echo '#!/bin/bash\n\
+# Start Xvfb\n\
+Xvfb :99 -screen 0 1024x768x24 &\n\
+export DISPLAY=:99\n\
+sleep 2\n\
+\n\
+# Start DOOM in background\n\
+chocolate-doom -iwad /doom/wads/doom1.wad -window -geometry 640x480 &\n\
+DOOM_PID=$!\n\
+echo "DOOM PID: $DOOM_PID"\n\
+sleep 3\n\
+\n\
+# Start COBOL interface\n\
+cd /doom/cobol-interface\n\
+python3 cobol_interface.py &\n\
+INTERFACE_PID=$!\n\
+\n\
+# Start memory reader bridge\n\
+cd /doom/bridge\n\
+python3 doom_memory_linux.py --pid $DOOM_PID &\n\
+BRIDGE_PID=$!\n\
+\n\
+# Keep container running\n\
+wait $DOOM_PID\n\
+' > /doom/start.sh && chmod +x /doom/start.sh
+
+# Expose ports
+EXPOSE 9999 8080 5900
+
+CMD ["/doom/start.sh"]

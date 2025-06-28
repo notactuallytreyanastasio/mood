@@ -69,6 +69,7 @@ rcsid[] = "$Id: g_game.c,v 1.8 1997/02/03 22:45:09 b1 Exp $";
 
 
 #include "g_game.h"
+#include "x_state.h"
 
 
 #define SAVEGAMESIZE	0x2c000
@@ -607,6 +608,9 @@ void G_Ticker (void)
     int		i;
     int		buf; 
     ticcmd_t*	cmd;
+    
+    // Export game state
+    X_ExportState();
     
     // do player reborns if needed
     for (i=0 ; i<MAXPLAYERS ; i++) 
